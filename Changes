@@ -1,2 +1,7 @@
+05/06/13 - Net::TL1 0.02
+  - Moved Login / Logout methods to Net::TL1
+  - Included Net::TL1::Alcatel in distribution
+  - removed default username/password
+
 05/05/20 - Net::TL1 0.01
   - Initial releas

@@ -10,13 +10,13 @@ use 5.006;
 use strict;
 use warnings;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 sub new {
-    my $this = shift;
-    my $class = ref($this) || $this;
-    my $self = {};
-    bless $self, $class;
+	my $this = shift;
+	my $class = ref($this) || $this;
+	my $self = {};
+	bless $self, $class;
 
 	my $ref = shift;
 	$self->{Debug} = defined $$ref{Debug} ? $$ref{Debug} : 0;
@@ -47,7 +47,7 @@ sub new {
 
 	@{$self->{ctags}} = ();
 
-    return $self;
+	return $self;
 }
 
 sub close {
@@ -106,14 +106,22 @@ sub ParseCompoundOutputLines {
 	foreach my $line (@{$this->{Commands}{$ctag}{Output}}) {
 		if ($line =~ /^\s*"(\w+)-(\d+)-(\d+)-(\d+)-(\d+)::(.+):(\S+),"\s*$/) {
 			my ($aid, $rack, $shelf, $slot, $port) = ($1, $2, $3, $4, $5);
-			my @data = split /,/, $6;
-			while (my $combo = shift @data) {
-				my ($param, $value) = split /=/, $combo;
-				if ($value =~ /^\s*\\"(.*)\\"\s*$/) {
-					$value = $1;
+			my $data = $6 . ",";
+			my $count = 0;
+			while (length $data && $count++ < 100) {
+				if ($data =~ /^(\w+)=\\"(.*?)\\",/) {
+					my ($param, $value) = ($1, $2);
+					$data = substr $data,(length ($1) + length ($2) + 6);
+					$this->{Commands}{$ctag}{Hash}{$aid}{$rack}{$shelf}{$slot}{$port}{$param} = $value;
+				} else {
+					if ($data =~ /^(\w+)=([^,]*?),/) {
+						my ($param, $value) = ($1, $2);
+						$data = substr $data,(length ($1) + length ($2) + 2);
+						$this->{Commands}{$ctag}{Hash}{$aid}{$rack}{$shelf}{$slot}{$port}{$param} = $value;
+					}
 				}
-				$this->{Commands}{$ctag}{Hash}{$aid}{$rack}{$shelf}{$slot}{$port}{$param} = $value;
 			}
+			die "No match\n" if ($count > 90);
 		} else {
 			$this->{Debug} > 4 && print STDERR "Couldn't parse: $line\n";
 		}
@@ -221,6 +229,30 @@ sub ParseBody {
 	return $read + 1 - $start;
 }
 
+sub Login {
+	my $this = shift;
+
+	my ($ref) = @_;
+	return if !defined $$ref{Target};
+
+	return if !defined $$ref{User} || !defined $$ref{Password};
+	$$ref{ctag} = defined $$ref{ctag} ? $$ref{ctag} : $this->get_newctag();
+
+	return $this->Execute
+		("ACT-USER:$$ref{Target}:$$ref{User}:$$ref{ctag}::$$ref{Password};");
+}
+
+sub Logout {
+	my $this = shift;
+
+	my ($ref) = @_;
+	return if !defined $$ref{Target};
+
+	$$ref{ctag} = defined $$ref{ctag} ? $$ref{ctag} : $this->get_newctag();
+
+	return $this->Execute ("CANC-USER:$$ref{Target}::$$ref{ctag}:;");
+}
+
 sub dumpraw {
 	my $this = shift;
 
@@ -297,7 +329,11 @@ Net::TL1 - Perl extension for managing network devices using TL1
 
   use Net::TL1;
 
-  $obj = new Net::Telnet ({Host => $host, Debug => [ 0 | 1 ], Port => $port});
+  $obj = new Net::TL1 ({Host => $host, Debug => [ 0 | 1 ], Port => $port});
+
+  $obj->Login ({Target => $target, User => $username,
+                Password => $password, ctag => $ctag});
+  $obj->Logout ({Target => $target});
 
   $obj->Execute($cmd);
   $obj->is_error($ctag);
