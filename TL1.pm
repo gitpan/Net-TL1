@@ -10,7 +10,7 @@ use 5.006;
 use strict;
 use warnings;
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 sub new {
 	my $this = shift;
@@ -21,8 +21,8 @@ sub new {
 	my $ref = shift;
 	$self->{Debug} = defined $$ref{Debug} ? $$ref{Debug} : 0;
 	$self->{Port} = defined $$ref{Port} ? $$ref{Port} : 14000;
-	$self->{Telnet} = new Net::Telnet
-		(Timeout => 60, Port => $self->{Port}, Prompt => '/;/');
+	$self->{Telnet} = new Net::Telnet (Timeout => 60, Port => $self->{Port},
+		Prompt => '/;/', Errmode => 'return');
 	if (defined $$ref{Host}) {
 		$self->{Host} = $$ref{Host};
 		($self->{Telnet})->open($self->{Host});
@@ -73,6 +73,8 @@ sub Execute {
 	return undef if !defined $this->{Telnet};
 
 	my $cmd = shift;
+	$this->{Debug} > 3 && print STDERR "EXECUTE: $cmd\n";
+
 	@{$this->{Result}{Raw}} = $this->{Telnet}->cmd ($cmd);
 	return $this->ParseRaw;
 }
@@ -89,6 +91,7 @@ sub ParseSimpleOutputLines {
 			if ($value =~ /^\s*\\"(.*)\\"\s*$/) {
 				$value = $1;
 			}
+			$this->{Debug} > 6 && print STDERR "DATA: $param -> $value\n";
 
 			$this->{Commands}{$ctag}{Hash}{$aid}{$rack}{$shelf}{$slot}{$port}{$param} = $value;
 		} else {
@@ -98,27 +101,86 @@ sub ParseSimpleOutputLines {
 	return scalar(@{$this->{Commands}{$ctag}{Output}});
 }
 
+sub ParseAid {
+	my $this = shift;
+
+	my ($ctag, $line) = @_;
+
+	my ($ref, $data, $status);
+	my ($aid, $rack, $shelf, $slot, $port);
+	if ($line =~ /^^\s*"(\w+)-([-\d]+):+(.*)$/) {
+		
+		$aid = $1;
+		($rack, $shelf, $slot, $port) = split /-/, $2;
+		$this->{Debug} > 5 && print STDERR "DATA: $aid-$rack-$shelf-$slot";
+	
+		if (!defined $port) {
+			$ref =
+				$this->{Commands}{$ctag}{Hash}{$aid}{$rack}{$shelf}{$slot} =
+				{};
+		} else {
+			$ref =
+			   $this->{Commands}{$ctag}{Hash}{$aid}{$rack}{$shelf}{$slot}{$port}
+			   = {};
+			$this->{Debug} > 5 && print STDERR "-$port";
+		}
+		$this->{Debug} > 5 && print STDERR "\n";
+		$data = $3;
+	}
+	
+	#
+	# Remove trailing ," from line, the comma is not always present.
+	#
+	if ($data =~ /(.*),*"\s*$/) {
+		$data = $1;
+	}
+	
+	#
+	# Some commands include an IS-NR, OS-NR status at the end, behind a colon
+	#
+	if ($data =~ /^(.*):(\S+)$/) {
+		$status = $2;
+		$data = $1;
+	}
+		
+	return ($ref, $data, $status);
+}
+
 sub ParseCompoundOutputLines {
 	my $this = shift;
 
 	my ($ctag) = @_;
 
 	foreach my $line (@{$this->{Commands}{$ctag}{Output}}) {
-		if ($line =~ /^\s*"(\w+)-(\d+)-(\d+)-(\d+)-(\d+)::(.+):(\S+),"\s*$/) {
-			my ($aid, $rack, $shelf, $slot, $port) = ($1, $2, $3, $4, $5);
-			my $data = $6 . ",";
+		my ($ref, $data, $status) = $this->ParseAid ($ctag, $line);
+		if (defined $ref) {
 			my $count = 0;
+			$data .= ",";
 			while (length $data && $count++ < 100) {
-				if ($data =~ /^(\w+)=\\"(.*?)\\",/) {
+				$this->{Debug} > 6 && print STDERR "DATA: $data\n";
+				if ($data=~ /^(\w+)=([^,]*?),(.*)$/) {
+					#
+					# We already have a generic match, let's see
+					# if we can do a more specific match, in these
+					# case a value that is surrounded by \" ... \"
+					# $1, $2 etc will be set by the last succesfull match
+					#
+					$data =~ /^(\w+)=\\"(.*?)\\",(.*)$/;
 					my ($param, $value) = ($1, $2);
-					$data = substr $data,(length ($1) + length ($2) + 6);
-					$this->{Commands}{$ctag}{Hash}{$aid}{$rack}{$shelf}{$slot}{$port}{$param} = $value;
-				} else {
-					if ($data =~ /^(\w+)=([^,]*?),/) {
-						my ($param, $value) = ($1, $2);
-						$data = substr $data,(length ($1) + length ($2) + 2);
-						$this->{Commands}{$ctag}{Hash}{$aid}{$rack}{$shelf}{$slot}{$port}{$param} = $value;
-					}
+					$this->{Debug} > 5 &&
+						print STDERR "PARAM: $param -> $value\n";
+					#$data = substr $data,(length ($1) + length ($2) + 6);
+					$data = $3;
+					$$ref{$param} = $value;
+				#} else {
+				#	if ($data =~ /^(\w+)=([^,]*?),(.*)$/) {
+				#		my ($param, $value) = ($1, $2);
+				#		$this->{Debug} > 5 &&
+				#			print STDERR "PARAM: $param -> $value\n";
+				#		#$data = substr $data,(length ($1) + length ($2) + 2);
+				#		$data = $3;
+				#		$$ref{$param} = $value;
+				#	}
 				}
 			}
 			die "No match\n" if ($count > 90);
@@ -133,6 +195,11 @@ sub ParseRaw {
 	my $this = shift;
 
 	my $lines = @{$this->{Result}{Raw}};
+	if ($this->{Debug} > 4) {
+		foreach my $line (@{$this->{Result}{Raw}}) {
+			print STDERR "RAW: $line";
+		}
+	}
 	my $index = 0;
 	my ($skip, $ctag);
 	my $ctag_added = 0;
@@ -152,7 +219,7 @@ sub ParseRaw {
 			$index += $skip;
 		}
 	} until ($index >= ($lines - 1) || $skip == 0);
-	return $this->{Commands}{$ctag}{Result};
+	return defined $ctag ?  $this->{Commands}{$ctag}{Result} : undef;
 }
 
 sub ParseHeader {
@@ -182,17 +249,27 @@ sub ParseHeader {
 	my $rc;
 	if ($line =~ /^\s*M\s+(\d+)\s+(\S+)\s*$/) {
 		$ctag = $1;
+		$this->{Debug} > 3 && print STDERR "SET ($read) CTAG to $1\n";
+		$this->{Debug} > 3 && print STDERR "SET ($read) Result to $2\n";
 		$rc = $this->{Commands}{$ctag}{Result} = $2;
 	}
 	$line = $this->{Result}{Raw}[++$read];
-	$this->{Debug} > 3 && print STDERR "READ ($read): $line";
-	if ($line =~ /^\s*\/\*\s*(\S+)\s*\*\/\s*$/) {
-		$this->{Commands}{$ctag}{Command} = $1;
+	if (defined $line) {
+		$this->{Debug} > 3 && print STDERR "READ ($read): $line";
+		if ($line =~ /^\s*\/\*\s*(\S+)\s*\*\/\s*$/) {
+			$this->{Debug} > 3 && print STDERR "SET ($read) Command to $1\n";
+			$this->{Commands}{$ctag}{Command} = $1;
+		}
+	} else {
+		$read--;
 	}
 	if (defined $rc && $rc eq 'DENY') {
 		$line = $this->{Result}{Raw}[++$read];
-		$this->{Debug} > 3 && print STDERR "READ: $line";
-		$this->{Commands}{$ctag}{Error} = $line;
+		if (defined $line) {
+			$this->{Debug} > 3 && print STDERR "READ: $line\n";
+			$this->{Debug} > 3 && print STDERR "SET ($read): Error to $line\n";
+			$this->{Commands}{$ctag}{Error} = $line;
+		}
 		return 0;
 	}
 	return ($read + 1 - $start, $ctag);
@@ -205,7 +282,8 @@ sub ParseBody {
 
 	my $lines = @{$this->{Result}{Raw}};
 	my $read = $lines - $start;
-	$this->{Debug} > 0 && print STDERR "BODY containts $read lines\n";
+	$this->{Debug} > 0 && print STDERR "BODY contains $read lines\n";
+	return 0 if ($read <= 0);
 	my $line = "";
 	foreach my $index ($start .. $lines - 1) {
 		$this->{Debug} > 1 &&
@@ -355,7 +433,7 @@ Net::TL1 - Perl extension for managing network devices using TL1
 =head1 DESCRIPTION
 
 Transaction Language 1 is a configuration interface to network
-devices used in public networks. Through its very structured but
+devices used in public networks. With its very structured but
 human-readable interface it is very suitable to provide the glue for
 netwerk device <-> OSS integration.
 

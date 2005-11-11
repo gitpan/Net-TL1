@@ -6,6 +6,86 @@ use Net::TL1;
 use strict;
 use warnings;
 
+our $VERSION = '0.03';
+
+sub rtrvservprov {
+	my $this = shift;
+
+	my ($ref) = @_;
+	$$ref{ctag} = defined $$ref{ctag} ? $$ref{ctag} : $this->get_newctag();
+
+	my $string = $this->get_linecommand
+		('RTRV-SERVPROV', 'SERV', $$ref{ctag}, $ref);
+
+	return undef if !defined $string;
+
+	my $result = $this->Execute ($string);
+
+	return undef if $this->is_error($$ref{ctag});
+
+	$this->ParseCompoundOutputLines ($$ref{ctag});
+	return $$ref{ctag};
+}
+
+sub rtrvservcurr {
+	my $this = shift;
+
+	my ($ref) = @_;
+	$$ref{ctag} = defined $$ref{ctag} ? $$ref{ctag} : $this->get_newctag();
+
+	my $string = $this->get_linecommand
+		('RTRV-SERVCURR', 'SERV', $$ref{ctag}, $ref);
+
+	return undef if !defined $string;
+
+	my $result = $this->Execute ($string);
+
+	return undef if $this->is_error($$ref{ctag});
+
+	$this->ParseCompoundOutputLines ($$ref{ctag});
+	return $$ref{ctag};
+}
+
+
+sub rtrvinvxdslcpe {
+	my $this = shift;
+
+	my ($ref) = @_;
+	$$ref{ctag} = defined $$ref{ctag} ? $$ref{ctag} : $this->get_newctag();
+
+	my $string = $this->get_linecommand
+		('RTRV-INV-XDSLCPE', 'XDSL', $$ref{ctag}, $ref);
+
+	return undef if !defined $string;
+
+	my $result = $this->Execute ($string);
+
+	return undef if $this->is_error($$ref{ctag});
+
+	$this->ParseCompoundOutputLines ($$ref{ctag});
+	return $$ref{ctag};
+}
+
+sub reptopstatatmport {
+	my $this = shift;
+
+	my ($ref) = @_;
+	$$ref{ctag} = defined $$ref{ctag} ? $$ref{ctag} : $this->get_newctag();
+
+	my $string = $this->get_linecommand
+		('REPT-OPSTAT-ATMPORT', 'LTATM', $$ref{ctag}, $ref);
+
+	return undef if !defined $string;
+
+	my $result = $this->Execute ($string);
+
+	return undef if $this->is_error($$ref{ctag});
+
+	$this->ParseSimpleOutputLines ($$ref{ctag});
+	return $$ref{ctag};
+}
+
+
 sub rtrvxdsl {
 	my $this = shift;
 
@@ -92,15 +172,18 @@ sub get_linecommand {
 	return undef if !defined $$ref{Target};
 	return undef if !defined $$ref{Rack} || !defined $$ref{Shelf}
 		|| !defined $$ref{Slot};
-	return undef if !defined $$ref{Circuit} &&
-		(!defined $$ref{FirstCircuit} || !defined $$ref{LastCircuit});
+	#return undef if !defined $$ref{Circuit} &&
+	#	(!defined $$ref{FirstCircuit} || !defined $$ref{LastCircuit});
 
-	my $string =
-		"$cmd:$$ref{Target}:$aid-$$ref{Rack}-$$ref{Shelf}-$$ref{Slot}-";
+	my $string = "$cmd:$$ref{Target}:$aid-$$ref{Rack}-$$ref{Shelf}";
+	if (defined $$ref{Slot}) {
+		$string .= "-$$ref{Slot}";
+	}
 	if (defined $$ref{Circuit}) {
-		$string .= $$ref{Circuit};
-	} else {
-		$string .= "$$ref{FirstCircuit}&&-$$ref{LastCircuit}";
+		$string .= "-$$ref{Circuit}";
+	} 
+	if (defined $$ref{FirstCircuit} && defined $$ref{LastCircuit}) {
+		$string .= "-$$ref{FirstCircuit}&&-$$ref{LastCircuit}";
 	}
 	$string .= ":$$ref{ctag}:;";
 	$this->{Debug} && print STDERR "$string\n";

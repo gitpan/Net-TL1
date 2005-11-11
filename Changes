@@ -1,3 +1,7 @@
+05/10/31 - Net::TL1 0.03
+  - Improved parser in $this->ParseCompoundOutputLines
+  - Added commands to Alcatel.pm module
+
 05/06/13 - Net::TL1 0.02
   - Moved Login / Logout methods to Net::TL1
   - Included Net::TL1::Alcatel in distribution
