@@ -195,59 +195,85 @@ __END__
 
 =head1 NAME
 
-Net::TL1::Alcatel - Perl extension for managing Alcatel network devices using TL1
+  Net::TL1::Alcatel - Perl extension for managing Alcatel network
+  devices using TL1
 
-=head1 SYNOPSIS
+=head1 SYNOPSIS 
 
   use Net::TL1::Alcatel;
 
-  $obj = new Net::TL1::Alcatel ({Host => $host, Debug => [ 0 | 1 ],
-                                Port => $port});
+  $ctag = $obj->rtrvxdsl([{ctag => $ctag}]);
+  $ctag = $obj->reptopstatxlnecom([{ctag => $ctag}]);
+  $ctag = $obj->reptopstatxbearer([{ctag => $ctag}]);
+  $ctag = $obj->reptopstatxline([{ctag => $ctag}]);
+  $ctag = $obj->rtrvservprov([{ctag => $ctag}]):
+  $ctag = $obj->rtrvservcurr ([{ctag => $ctag}]):
+  $ctag = $obj->rtrvinvxdslcpe([{ctag => $ctag}]):
+  $ctag = $obj->reptopstatatmport([{ctag => $ctag}]):
 
-  $obj->Login ({Target => $target, User => $username,
-                Password => $password, ctag => $ctag});
+  Methods inherited from Net::TL1 :
+
+  $obj = new Net::TL1 ({
+    Host => $host,
+    [Port => $port],
+    [Debug => $val]
+  });
+
+  $obj->Login ({
+    Target => $target,
+    User => $username,
+    Password => $password,
+    [ctag => $ctag]
+  });
+
   $obj->Logout ({Target => $target});
-  $obj->Execute($cmd);
 
-  $ctag = $obj->rtrvxdsl({ctag => $ctag});
-  $ctag = $obj->reptopstatxlnecom({ctag => $ctag});
-  $ctag = $obj->reptopstatxbearer({ctag => $ctag});
-  $ctag = $obj->reptopstatxline({ctag => $ctag});
+  $lines = $obj->Execute($cmd, [@output]);
 
-  $obj->is_error($ctag);
-  $obj->ParseRaw;
-  $obj->ParseHeader;
-  $obj->ParseBody;
-  $obj->ParseSimpleOutputLines($ctag);
-  $obj->ParseCompoundOutputLines($ctag);
+  $bool = $obj->is_error($ctag);
+  $ctag = $obj->get_ctag;
+  $lines = $obj->ParseRaw;
+  ($lines, $ctag) = $obj->ParseHeader;
+  ($ref, $data, $status) = $obj->ParseAid($ctag, $line);
+  $lines = $obj->ParseBody;
+  $lines = $obj->ParseSimpleOutputLines($ctag);
+  $lines = $obj->ParseCompoundOutputLines($ctag);
 
-  $obj->get_hashref;
-  $obj->get_hashref($ctag);
+  $ctag = $obj->get_newctag;
+  $ref = $obj->get_hashref([$ctag]);
 
+  $obj->read_testfile($filename);
   $obj->dumpraw;
-  $obj->dumphash;
-  $obj->dumphash($ctag);
 
   $obj->close;
 
 =head1 DESCRIPTION
 
-Transaction Language 1 is a configuration interface to network
-devices used in public networks. Through its very structured but
-human-readable interface it is very suitable to provide the glue for
-netwerk device <-> OSS integration.
+  Transaction Language 1 is a configuration interface to network
+  devices used in public networks. Through its very structured but
+  human-readable interface it is very suitable to provide the glue for
+  netwerk device <-> OSS integration.
 
-The Net::TL1 module provides an interface to the sometimes arcane
-TL1 commands and parses the output of these commands for easy
-processing in scripts.
+  The Net::TL1::Alcatel module provides an interface to the AWS TL1
+  gatway product of Alcatel. Several of the TL1 commands are directly
+  supported using methods available in the class.
 
-At this time the support for the different commands and features is
-quite limited. Not all the required commands are supported and neither
-is alarm processing.
+  Each of the methods require a reference to hash be passed with the 
+  following keys:
+  
+    'Target': Name of the network device
+    'Rack', 'Shelf', 'Slot'
+    Either 'Circuit' or 'FirstCircuit' and 'LastCircuit' to support 
+    ranges of ports.
+    'ctag': The ctag key is optional. If none is provided then a ctag
+    will be randomly assigned.
+	
+  Please see the Net::TL1 POD documentation for detailed documentation
+  of the module.
 
 =head2 REQUIRES
 
-  Net::Telnet
+  Net::TL1
 
 =head2 EXPORT
 
@@ -255,17 +281,19 @@ is alarm processing.
 
 =head1 AUTHOR
 
-Steven Hessing, E<lt>stevenh@xsmail.comE<gt>
+  Steven Hessing, E<lt>stevenh@xsmail.comE<gt>
 
 =head1 SEE ALSO
 
-L<http://www.tl1.com/>
+=item L<http://www.tl1.com/>
+
+=item Net::TL1
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (c) 2005, Steven Hessing. All rights reserved. This
-program is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself.
+  Copyright (c) 2005, Steven Hessing. All rights reserved. This
+  program is free software; you can redistribute it and/or modify
+  it under the same terms as Perl itself.
 
 =cut
 

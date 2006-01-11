@@ -1,4 +1,4 @@
-Net/TL1 version 0.02
+Net/TL1 version 0.03
 ====================
 
 Transaction Language 1 is a configuration interface to
@@ -9,7 +9,6 @@ to provide the glue for netwerk device <-> OSS integration.
 The Net::TL1 module provides an interface to the sometimes
 arcane TL1 commands and parses the output of these commands
 for easy processing in scripts.
-
 
 INSTALLATION
 
@@ -25,9 +24,10 @@ DEPENDENCIES
 This module requires these other modules and libraries:
 
   Net::Telnet
+  FreezeThaw is required for the 'make test' functionality
 
 AUTHOR
-       Steven Hessing, <stevenh@xsmail.com>
+  Steven Hessing, <stevenh@xsmail.com>
 
 COPYRIGHT AND LICENCE
 
